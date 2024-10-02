@@ -44,6 +44,10 @@ az group create --name $RG --location $REGION
 
 ## Azure Kubernetes Service (AKS) Automatic
 
+### Cluster creation
+
+Instructions are based from: [https://learn.microsoft.com/en-us/azure/aks/learn/quick-kubernetes-automatic-deploy]()
+
 1. Install AKS preview extension:
 
     ```bash
@@ -60,3 +64,69 @@ az group create --name $RG --location $REGION
     az feature register --namespace Microsoft.ContainerService --name DisableSSHPreview
     az feature register --namespace Microsoft.ContainerService --name AutomaticSKUPreview
     ```
+
+1. Create Automatic AKS cluster (instructions from: [https://learn.microsoft.com/en-us/azure/aks/learn/quick-kubernetes-automatic-deploy?pivots=azure-cli]()):
+
+    ```bash
+    ALT_REGION=westus2
+    CLUSTER=aks-automatic-demo-1
+    az aks create --resource-group $RG --name $CLUSTER \
+    --location $ALT_REGION  --sku automatic --disable-local-accounts 
+    ```
+
+### RBAC Role assignment
+
+NOTE: Depending on subscription restrictions, the last command may not work,
+thus it recommended to run these commands using Azure Cloud Shell.
+
+1. Get your user id:
+    ```bash
+    USERID=$(az ad signed-in-user show --query "id" -o tsv | tr -d '\r')
+    ```
+
+1. Get cluster ID:
+    ```bash
+    AKS_ID=$(az aks show --resource-group $RG --name $CLUSTER --query id --output tsv)
+
+1. Grand RBAC role:
+    ```bash
+    az role assignment create --role "Azure Kubernetes Service RBAC Cluster Admin" --assignee $USERID --scope $AKS_ID
+    ```
+
+### Log into AKS cluster
+
+1. Log into the AKS cluster:
+
+    ```bash
+    az aks get-credentials --resource-group $RG --name $CLUSTER
+    ```
+
+1. Next use `kubelogin` to convert `kubeconfig` file to use `azurecli`
+
+    ```bash
+    kubelogin convert-kubeconfig -l azurecli
+    ```
+
+### Deploy AKS application
+
+1. Create namespace:
+
+    ```bash
+    kubectl create ns aks-store-demo
+    ```
+
+1. Deploy the application:
+
+    ```bash
+    kubectl apply -n aks-store-demo -f https://raw.githubusercontent.com/Azure-Samples/aks-store-demo/main/aks-store-ingress-quickstart.yaml
+    ```
+
+### Validate application
+
+1. Run this command until ADDRESS is available:
+
+    ```bash
+    kubectl get ingress store-front -n aks-store-demo --watch
+    ```
+
+1. Naviate to the IP ADDRESS from command below in a browser
